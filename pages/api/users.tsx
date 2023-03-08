@@ -22,10 +22,28 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   switch (req.method) {
     /* -------------------- GET ------------------------ */
     case "GET":
-      // 405: METHOD NOT ALLOWED
-      res.status(405).redirect("/");
-      /* Getting the user is done via the util function `getUser(context)`
-       to be able to retrieve the user object with Next.js */
+      /* Getting the user should primarily be done via the util function `getUser(context)`
+       to be able to retrieve the user object with Next.js pages and automatically reroute
+       to the login page when the user isn't logged in */
+
+      // Extract authentication token from header
+      token = typeof req.headers.token === "string" ? req.headers.token : "";
+      // If no token, 400: Bad request
+      if (!token) {
+        res.status(400).json({ error: true, data: "bad request" });
+        break;
+      }
+
+      // Attempt to find user via token
+      let user = await users.findOne({ token: token });
+      // If no user found, 404: not found
+      if (!user) {
+        res.status(404).json({ error: true, data: "user not found with that token" });
+        break;
+      }
+
+      // else, send the user back
+      res.status(200).json({ error: false, data: user });
       break;
     /* -------------------- POST ------------------------ */
     // Create new user only if using a POST request
@@ -52,7 +70,14 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       let hashPassword = crypto.createHash("sha256").update(password).digest("hex");
 
       // create a user object and post it to the database
-      const newUser = new User(username, email, hashPassword, new Date());
+      const newUser = {
+        username: username,
+        email: email,
+        password: hashPassword,
+        created: new Date(),
+        verified: false
+      }
+
       users.insertOne(newUser);
 
       // 201: CREATED

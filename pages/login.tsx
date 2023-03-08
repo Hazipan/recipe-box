@@ -27,7 +27,7 @@ const Login = () => {
       // Hash the password before passing it to the API
       let hashPassword = crypto.createHash("sha256").update(password).digest("hex");
 
-      // Use the users GET API endpoint to authenticate the user
+      // Use the users /login GET API endpoint to authenticate the user
       // Store the response (a JWT) as a cookie on the client
       fetch("/api/login",
         {
@@ -41,10 +41,9 @@ const Login = () => {
           return data;
         })
         .then(data => {
+          // If no error, check to see if the account has been verified using checkVerification(token)
           if (!data.error) {
-            // Redirect to the main page after successful login
-            createCookie(data.data);
-            router.push("/")
+            checkVerification(data.data);
           } else {
             setError(data.data);
           }
@@ -53,6 +52,24 @@ const Login = () => {
     } else {
       return false;
     }
+  }
+
+  const checkVerification = (token: string) => {
+    // Get user from database via given token
+    fetch("/api/users", { headers: { token: token } })
+      .then(res => res.json())
+      .then(data => {
+        const user = data.data;
+        console.log(user);
+        // If user is verified, store cookie on the client and redirect to home page
+        if (user.verified) {
+          createCookie(token);
+          router.push("/")
+          // Otherwise, push to /profile/verify to start verification
+        } else {
+          router.push(`/profile/verify?email=${user.email}`)
+        }
+      })
   }
 
   const createCookie = (data: string) => {
